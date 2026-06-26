@@ -1,0 +1,45 @@
+version: '3.8'
+
+volumes:
+  storage:
+    driver: local
+
+networks:
+  proxy:
+    driver: bridge
+
+services:
+  redis-studio:
+    image: redis:7-alpine
+    container_name: redis-studio
+    ports:
+      - "6379:6379"
+    networks:
+      - proxy
+    volumes:
+      - redis_data:/data
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: worker-app
+    environment:
+      - NODE_ENV=development
+      - REDIS_HOST=redis-studio
+      - REDIS_PORT=6379
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - storage:/app/storage
+    command: npm run dev
+    networks:
+      - proxy
+    depends_on:
+      - redis-studio
+    deploy:
+      resources:
+        limits:
+          cpus: '3.0'
+          memory: 6G
+
