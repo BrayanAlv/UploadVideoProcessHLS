@@ -25,8 +25,6 @@ services:
     command: npm run dev
     networks:
       - proxy
-    depends_on:
-      - redis-studio
     deploy:
       resources:
         limits:
