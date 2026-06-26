@@ -9,16 +9,6 @@ networks:
     driver: bridge
 
 services:
-  redis-studio:
-    image: redis:7-alpine
-    container_name: redis-studio
-    ports:
-      - "6379:6379"
-    networks:
-      - proxy
-    volumes:
-      - redis_data:/data
-
   worker:
     build:
       context: .
