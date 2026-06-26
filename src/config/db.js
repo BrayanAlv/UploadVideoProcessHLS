@@ -8,14 +8,16 @@ export const connectDB = async () => {
     // Configurar mongoose para que no espere infinitamente si no hay conexión
     // bufferCommands: false hace que las operaciones fallen inmediatamente si no hay conexión
     mongoose.set('bufferCommands', false);
-    
-    await mongoose.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000, // Tiempo de espera para seleccionar el servidor (5s)
+
+    await mongoose.connect(process.env.MONGO_URI, {
+      dbName: process.env.DB_NAME,
+      serverSelectionTimeoutMS: 5000,
     });
-    console.log('✅ MongoDB conectado');
+
+    console.log(' MongoDB conectado');
   } catch (error) {
-    console.error('❌ Error al conectar a MongoDB:', error.message);
-    console.log('⚠️ Continuando sin conexión a MongoDB. Las operaciones de BD fallarán inmediatamente.');
+    console.error(' Error al conectar a MongoDB:', error.message);
+    console.log(' Continuando sin conexión a MongoDB. Las operaciones de BD fallarán inmediatamente.');
   }
 };
 

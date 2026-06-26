@@ -1,4 +1,4 @@
-import Video from '../models/Video.js';
+import Contenido from '../models/Contenido.js';
 import { videoQueue } from '../workers/videoWorker.js';
 import fs from 'fs';
 import path from 'path';
@@ -26,23 +26,33 @@ export const uploadVideo = async (req, res, next) => {
       return res.status(400).json({ error: 'El título es obligatorio' });
     }
 
-    const video = new Video({
-      title,
-      originalFileName: req.file.originalname,
-      originalPath: req.file.path, // Apunta temporalmente al volumen compartido
-      originalSize: req.file.size,
-      status: 'uploaded'
+    console.log(`[Controller] Creando contenido con nombre: ${title}, archivo: ${req.file.originalname}`);
+
+    const contenido = new Contenido({
+      nombre: title,
+      fileKey: req.file.path,
+      carpeta: 'Videos',
+      videoProcessing: {
+        status: 'uploaded',
+        originalFileName: req.file.originalname,
+        originalPath: req.file.path,
+        originalSize: req.file.size
+      }
     });
 
-    await video.save();
+    await contenido.save();
+    console.log(`[Controller] Contenido creado con _id: ${contenido._id}`);
 
-    // Agrega el trabajo a BullMQ pasándole el ID y la ruta del archivo temporal
-    await videoQueue.add('process-video', {
-      videoId: video._id,
-      tempPath: req.file.path
-    });
+    // Agrega el trabajo a BullMQ pasándole el ID del contenido
+    const jobData = {
+      videoId: contenido._id,
+      s3Key: req.file.path,
+      fileID: null
+    };
+    console.log(`[Controller] Agregando job a queue con data:`, JSON.stringify(jobData));
+    await videoQueue.add('process-video', jobData);
 
-    res.status(201).json({ success: true, videoId: video._id });
+    res.status(201).json({ success: true, videoId: contenido._id });
   } catch (error) {
     next(error);
   }
@@ -77,9 +87,9 @@ export const uploadVideo = async (req, res, next) => {
 
 export const getVideoStatus = async (req, res, next) => {
   try {
-    const video = await Video.findById(req.params.id);
-    if (!video) return res.status(404).json({ error: 'Video no encontrado' });
-    res.json({ status: video.status, progress: video.progress });
+    const contenido = await Contenido.findById(req.params.id);
+    if (!contenido) return res.status(404).json({ error: 'Video no encontrado' });
+    res.json({ status: contenido.videoProcessing?.status, progress: contenido.videoProcessing?.progress });
   } catch (error) {
     next(error);
   }
@@ -87,20 +97,24 @@ export const getVideoStatus = async (req, res, next) => {
 
 export const getVideoDetail = async (req, res, next) => {
   try {
-    const video = await Video.findById(req.params.id);
-    if (!video) return res.status(404).json({ error: 'Video no encontrado' });
+    const contenido = await Contenido.findById(req.params.id);
+    if (!contenido) return res.status(404).json({ error: 'Video no encontrado' });
+    console.log(`[Controller] getVideoDetail: ${contenido._id}, nombre: ${contenido.nombre}`);
+
+    const vp = contenido.videoProcessing || {};
+
     res.json({
-      id: video._id,
-      title: video.title,
-      status: video.status,
-      thumbnailPath: video.thumbnailPath,
-      previewVttPath: video.previewVttPath,
-      hlsMasterPath: video.hlsMasterPath,
-      availableQualities: video.availableQualities,
-      originalResolution: video.originalResolution,
-      duration: video.duration,
-      size: video.originalSize,
-      errorMessage: video.errorMessage
+      id: contenido._id,
+      title: contenido.nombre,
+      status: vp.status,
+      thumbnailPath: vp.thumbnailPath,
+      previewVttPath: vp.previewVttPath,
+      hlsMasterPath: vp.masterPlaylist,
+      availableQualities: vp.availableQualities,
+      originalResolution: vp.originalResolution,
+      duration: vp.duration,
+      size: vp.originalSize,
+      errorMessage: vp.errorMessage
     });
   } catch (error) {
     next(error);
@@ -113,8 +127,25 @@ export const listVideos = async (req, res, next) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    const videos = await Video.find().sort({ createdAt: -1 }).skip(skip).limit(limit);
-    const total = await Video.countDocuments();
+    const contenidos = await Contenido.find()
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+    const total = await Contenido.countDocuments();
+
+    const videos = contenidos.map(c => ({
+      id: c._id,
+      title: c.nombre,
+      status: c.videoProcessing?.status,
+      progress: c.videoProcessing?.progress,
+      thumbnailPath: c.videoProcessing?.thumbnailPath,
+      previewVttPath: c.videoProcessing?.previewVttPath,
+      availableQualities: c.videoProcessing?.availableQualities,
+      originalResolution: c.videoProcessing?.originalResolution,
+      duration: c.videoProcessing?.duration,
+      size: c.videoProcessing?.originalSize,
+      createdAt: c.createdAt
+    }));
 
     res.json({ videos, pagination: { total, page, pages: Math.ceil(total / limit) } });
   } catch (error) {
@@ -127,8 +158,9 @@ export const streamVideo = async (req, res, next) => {
     const { id } = req.params;
     const { download } = req.query;
 
-    const video = await Video.findById(id);
-    if (!video) return res.status(404).json({ error: 'Video no encontrado' });
+    const contenido = await Contenido.findById(id);
+    if (!contenido) return res.status(404).json({ error: 'Video no encontrado' });
+    console.log(`[Controller] streamVideo: ${id}`);
 
     // Ruta estática dentro del volumen compartido
     const videoPath = path.join(process.cwd(), 'storage', 'videos', id, 'raw', 'original.mp4');
@@ -144,7 +176,7 @@ export const streamVideo = async (req, res, next) => {
     const range = req.headers.range;
 
     if (download === 'true') {
-      res.setHeader('Content-Disposition', `attachment; filename="${video.title}_original.mp4"`);
+      res.setHeader('Content-Disposition', `attachment; filename="${contenido.nombre}_original.mp4"`);
     }
 
     if (range) {
