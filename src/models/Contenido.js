@@ -5,7 +5,7 @@ import mongoose from 'mongoose';
 const videoProcessingSchema = new mongoose.Schema({
     status: {
         type: String,
-        enum: ['uploaded', 'processing', 'completed', 'failed'],
+        enum: ['uploaded', 'queued', 'processing', 'completed', 'failed', 'error'],
         default: 'uploaded'
     },
 
