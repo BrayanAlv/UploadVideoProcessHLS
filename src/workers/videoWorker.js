@@ -61,7 +61,7 @@ async function uploadFolderToB2(localDirPath, b2FolderPath) {
 }
 
 function jobIdFor(videoId) {
-    return `video:${videoId}`;
+    return `video-${videoId}`;
 }
 
 export function createWorker() {
@@ -263,4 +263,55 @@ export async function enqueueVideoProcessing({videoId, s3Key, fileId}) {
         {videoId, s3Key, fileId: fileId ?? null},
         {jobId: jobIdFor(videoId)}
     );
+}
+
+export function startReconciler(model, enqueueFn) {
+    const SUPPORTED_FOLDERS = ['Videos', 'FormacionVendedores'];
+    const INTERVAL_MS = Number(process.env.RECONCILER_INTERVAL_MS || 5 * 60 * 1000);
+    const STALE_QUEUED_MS = Number(process.env.RECONCILER_STALE_MS || 2 * 60 * 1000);
+
+    async function reconcileOnce() {
+        try {
+            const cutoff = new Date(Date.now() - STALE_QUEUED_MS);
+            const docs = await model.find({
+                carpeta: { $in: SUPPORTED_FOLDERS },
+                fileKey: { $exists: true, $nin: ['', null] },
+                $or: [
+                    { 'videoProcessing.status': 'queued' },
+                    {
+                        'videoProcessing.status': { $exists: false },
+                        videoProcessing: { $exists: false }
+                    },
+                    {
+                        'videoProcessing.status': 'processing',
+                        'videoProcessing.progress': { $lt: 100 },
+                        creadoEn: { $lt: cutoff }
+                    }
+                ]
+            }).limit(50);
+
+            if (!docs.length) return;
+
+            console.log(`[Reconciler] Encontrados ${docs.length} videos pendientes`);
+            for (const doc of docs) {
+                const id = String(doc._id);
+                try {
+                    await enqueueFn({
+                        videoId: id,
+                        s3Key: doc.fileKey,
+                        fileId: doc.fileId ?? null,
+                    });
+                    console.log(`[Reconciler] Reencolado video ${id} (carpeta ${doc.carpeta})`);
+                } catch (err) {
+                    console.warn(`[Reconciler] No se pudo reencolar video ${id}: ${err.message}`);
+                }
+            }
+        } catch (err) {
+            console.error('[Reconciler] Error durante la reconciliación:', err.message);
+        }
+    }
+
+    setTimeout(reconcileOnce, 10 * 1000);
+    setInterval(reconcileOnce, INTERVAL_MS);
+    console.log(`[Reconciler] Activo cada ${INTERVAL_MS}ms (corte ${STALE_QUEUED_MS}ms)`);
 }

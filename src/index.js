@@ -8,6 +8,7 @@ import videoRoutes from './routes/videoRoutes.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger.js';
+import Contenido from './models/Contenido.js';
 
 // Cargar variables de entorno
 dotenv.config();
@@ -20,11 +21,13 @@ const PORT = process.env.PORT || 3000;
   await connectDB();
 
   // Crear el Worker SOLO después de que la conexión esté establecida
-  const { createWorker } = await import('./workers/videoWorker.js');
+  const { createWorker, startReconciler, enqueueVideoProcessing } = await import('./workers/videoWorker.js');
   const videoWorker = createWorker();
   videoWorker.on('failed', (job, err) => {
     console.error(`[Worker] Error crítico persistente en Job ${job.id}: ${err.message}`);
   });
+
+  startReconciler(Contenido, enqueueVideoProcessing);
 
   // Middlewares
   app.use(cors({
