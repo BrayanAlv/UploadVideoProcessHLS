@@ -6,6 +6,7 @@ import {
     HeadObjectCommand,
     CopyObjectCommand,
     DeleteObjectCommand,
+    DeleteObjectsCommand,
     CreateMultipartUploadCommand,
     UploadPartCommand,
     CompleteMultipartUploadCommand,
@@ -234,6 +235,48 @@ export async function downloadBuffer(key) {
 export async function deleteFile(key) {
     const command = new DeleteObjectCommand({ Bucket: BUCKET, Key: key });
     await withB2Retry(() => s3.send(command));
+    _cacheDelete(key);
+}
+
+// Borra recursivamente todos los objetos bajo un prefijo (una "carpeta").
+// Usado al reprocesar para eliminar el HLS viejo y no dejar segmentos huérfanos
+// que ocupen espacio. Devuelve la cantidad de objetos borrados.
+export async function deleteFolder(prefix) {
+    // Normalizamos: sin barra final para no perder objetos y luego listamos por prefijo.
+    const normalized = String(prefix).replace(/\/+$/, "");
+    let continuationToken = undefined;
+    let deleted = 0;
+
+    do {
+        const listCommand = new ListObjectsV2Command({
+            Bucket: BUCKET,
+            Prefix: `${normalized}/`,
+            ...(continuationToken ? { ContinuationToken: continuationToken } : {}),
+        });
+        const response = await withB2Retry(() => s3.send(listCommand));
+        const contents = response.Contents || [];
+
+        if (contents.length) {
+            // DeleteObjects acepta hasta 1000 llaves por lote.
+            for (let i = 0; i < contents.length; i += 1000) {
+                const batch = contents.slice(i, i + 1000);
+                const deleteCommand = new DeleteObjectsCommand({
+                    Bucket: BUCKET,
+                    Delete: {
+                        Objects: batch.map((item) => ({ Key: item.Key })),
+                        Quiet: true,
+                    },
+                });
+                await withB2Retry(() => s3.send(deleteCommand));
+                batch.forEach((item) => _cacheDelete(item.Key));
+                deleted += batch.length;
+            }
+        }
+
+        continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
+    } while (continuationToken);
+
+    return deleted;
 }
 
 export async function updateFileMetadata(key, newMetadata) {

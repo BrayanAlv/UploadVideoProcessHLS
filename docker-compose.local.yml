@@ -1,0 +1,45 @@
+# Compose LOCAL autocontenido: levanta Redis + la app juntos.
+# Mongo apunta al remoto (MONGO_URI en tu .env). B2 también sale del .env.
+#
+# Uso:
+#   docker compose -f docker-compose.local.yml up --build
+#   WORKER_CONCURRENCY=2 docker compose -f docker-compose.local.yml up --build
+#
+# Cuántos videos a la vez  -> WORKER_CONCURRENCY (default 1)
+# Credenciales del panel   -> ADMIN_USER / ADMIN_PASSWORD (default admin / admin)
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: uploadvideo-redis-local
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+    container_name: uploadvideo-app-local
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Redis del propio compose (sobrescribe lo que venga en .env)
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      # Videos procesados a la vez (default 1 si no lo defines al levantar)
+      WORKER_CONCURRENCY: "${WORKER_CONCURRENCY:-1}"
+      # Credenciales del panel admin (default admin/admin)
+      ADMIN_USER: "${ADMIN_USER:-admin}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-admin}"
+    ports:
+      - "3000:3000"
+    volumes:
+      - storage-local:/app/storage
+    depends_on:
+      - redis
+
+volumes:
+  storage-local:
+    driver: local

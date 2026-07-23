@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reproceso de videos — Admin</title>
+  <style>
+    :root { --bg:#0f1216; --panel:#1a1f27; --border:#2a313c; --text:#e6e9ef; --muted:#9aa4b2; --accent:#3b82f6; --ok:#22c55e; --warn:#f59e0b; --err:#ef4444; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:var(--bg); color:var(--text); }
+    header { padding:14px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+    h1 { font-size:18px; margin:0; }
+    .muted { color:var(--muted); font-size:13px; }
+    .tabs { display:flex; gap:6px; margin-left:8px; }
+    .tab { background:transparent; border:1px solid var(--border); color:var(--muted); padding:6px 14px; border-radius:8px; cursor:pointer; font-size:14px; }
+    .tab.active { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+    main { padding:16px 20px; }
+    .view { display:none; }
+    .view.active { display:block; }
+    .filters { display:flex; gap:10px; flex-wrap:wrap; align-items:end; margin-bottom:14px; }
+    .field { display:flex; flex-direction:column; gap:4px; }
+    label { font-size:12px; color:var(--muted); }
+    input, select, button, textarea { background:var(--panel); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:14px; font-family:inherit; }
+    button { cursor:pointer; }
+    button.primary { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+    button.primary:disabled { opacity:.5; cursor:not-allowed; }
+    button.small { padding:3px 8px; font-size:12px; }
+    .bar { display:flex; align-items:center; gap:12px; margin:10px 0; flex-wrap:wrap; }
+    .tablewrap { overflow-x:auto; border:1px solid var(--border); border-radius:10px; }
+    table { border-collapse:collapse; width:100%; min-width:900px; }
+    th, td { text-align:left; padding:9px 10px; border-bottom:1px solid var(--border); font-size:13px; vertical-align:middle; }
+    th { color:var(--muted); font-weight:600; position:sticky; top:0; background:var(--panel); }
+    tr:hover td { background:#141922; }
+    .pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600; }
+    .v-vertical { background:rgba(59,130,246,.15); color:#93c5fd; }
+    .v-horizontal { background:rgba(245,158,11,.15); color:#fcd34d; }
+    .v-desconocida, .v-cuadrada { background:rgba(154,164,178,.15); color:var(--muted); }
+    .s-completed { color:var(--ok); }
+    .s-processing, .s-queued { color:var(--warn); }
+    .s-failed, .s-error { color:var(--err); }
+    .name { max-width:320px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .id { font-family:ui-monospace, monospace; font-size:11px; color:var(--muted); }
+    .pager { display:flex; gap:8px; align-items:center; justify-content:flex-end; margin-top:12px; }
+    .cards { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+    .card { border:1px solid var(--border); border-radius:10px; padding:10px 12px; background:var(--panel); cursor:pointer; min-width:200px; }
+    .card:hover { border-color:var(--accent); }
+    .card.sel { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset; }
+    .card .bid { font-family:ui-monospace, monospace; font-size:11px; color:var(--muted); }
+    .card .nums { margin-top:6px; font-size:13px; display:flex; gap:10px; flex-wrap:wrap; }
+    #toast { position:fixed; bottom:16px; right:16px; background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:12px 14px; max-width:380px; font-size:13px; display:none; z-index:20; }
+    .modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; z-index:30; }
+    .modal-bg.open { display:flex; }
+    .modal { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:16px 18px; max-width:720px; width:92%; max-height:80vh; overflow:auto; }
+    .modal h3 { margin:0 0 10px; font-size:16px; }
+    .close { float:right; }
+    textarea { width:260px; height:38px; resize:vertical; }
+    /* Grid de tarjetas de video */
+    .vgrid { display:grid; grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); gap:14px; }
+    .vcard { border:1px solid var(--border); border-radius:12px; overflow:hidden; background:var(--panel); position:relative; transition:border-color .12s, box-shadow .12s; }
+    .vcard.sel { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset; }
+    .vcard .thumb { position:relative; width:100%; aspect-ratio:16/10; background:#0b0e12; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+    .vcard .thumb img { width:100%; height:100%; object-fit:contain; display:block; }
+    .vcard .thumb .ph { color:var(--muted); font-size:12px; }
+    .vcard .chk { position:absolute; top:8px; left:8px; width:20px; height:20px; z-index:2; cursor:pointer; }
+    .vcard .badge { position:absolute; top:8px; right:8px; z-index:2; }
+    .vcard .hbtn { position:absolute; bottom:8px; right:8px; z-index:2; }
+    .vcard .info { padding:9px 10px; }
+    .vcard .vname { font-size:13px; font-weight:600; line-height:1.25; max-height:2.5em; overflow:hidden; }
+    .vcard .meta { margin-top:5px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; font-size:11px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Reproceso de videos</h1>
+    <div class="tabs">
+      <button class="tab active" data-tab="videos">Videos</button>
+      <button class="tab" data-tab="historial">Historial</button>
+    </div>
+    <span class="muted" id="header-hint">Selección manual · corrige orientación y regenera HLS (CPU)</span>
+  </header>
+
+  <main>
+    <!-- ===================== VIDEOS ===================== -->
+    <section id="view-videos" class="view active">
+      <div class="filters">
+        <div class="field">
+          <label>Buscar (nombre)</label>
+          <input id="f-q" placeholder="ej. San Miguel" />
+        </div>
+        <div class="field">
+          <label>Carpeta</label>
+          <select id="f-carpeta">
+            <option value="">Todas</option>
+            <option value="Videos">Videos</option>
+            <option value="FormacionVendedores">FormacionVendedores</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Estado</label>
+          <select id="f-status">
+            <option value="">Todos</option>
+            <option value="completed">completed</option>
+            <option value="processing">processing</option>
+            <option value="queued">queued</option>
+            <option value="failed">failed</option>
+            <option value="error">error</option>
+            <option value="uploaded">uploaded</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Orientación (CRM)</label>
+          <select id="f-orient">
+            <option value="">Todas</option>
+            <option value="vertical">vertical</option>
+            <option value="horizontal">horizontal</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Por página</label>
+          <select id="f-limit"><option>20</option><option>50</option><option>100</option></select>
+        </div>
+        <button id="btn-buscar">Buscar</button>
+      </div>
+
+      <div class="bar">
+        <div class="field">
+          <label>Motivo del reproceso (opcional)</label>
+          <textarea id="reason" placeholder="ej. vertical mal orientado"></textarea>
+        </div>
+        <div class="field">
+          <label>Qué procesar</label>
+          <select id="mode">
+            <option value="full">Ambos (video + preview)</option>
+            <option value="preview">Solo preview</option>
+          </select>
+        </div>
+        <button id="btn-reprocess" class="primary" disabled>Reprocesar seleccionados</button>
+        <span id="sel-count" class="muted">0 seleccionados</span>
+        <label class="muted" style="display:flex; align-items:center; gap:6px;">
+          <input type="checkbox" id="check-all" style="width:auto;" /> Seleccionar todo
+        </label>
+        <label class="muted" style="display:flex; align-items:center; gap:6px; margin-left:auto;">
+          <input type="checkbox" id="autorefresh" style="width:auto;" /> Auto-actualizar (4s)
+        </label>
+        <span id="total" class="muted"></span>
+      </div>
+
+      <div id="grid" class="vgrid"><span class="muted">Cargando…</span></div>
+
+      <div class="pager">
+        <span id="page-info" class="muted"></span>
+        <button id="btn-prev">◀ Anterior</button>
+        <button id="btn-next">Siguiente ▶</button>
+      </div>
+    </section>
+
+    <!-- ===================== HISTORIAL ===================== -->
+    <section id="view-historial" class="view">
+      <div class="bar">
+        <strong>Lotes recientes</strong>
+        <button id="btn-refresh-hist" class="small">↻ Refrescar</button>
+        <label class="muted" style="display:flex; align-items:center; gap:6px;">
+          <input type="checkbox" id="autorefresh-hist" style="width:auto;" /> Auto-actualizar (4s)
+        </label>
+        <span id="hist-hint" class="muted" style="margin-left:auto;"></span>
+      </div>
+      <div class="cards" id="batches"><span class="muted">Cargando lotes…</span></div>
+
+      <div class="filters">
+        <div class="field">
+          <label>Filtrar por lote (batchId)</label>
+          <input id="h-batch" placeholder="lote-..." />
+        </div>
+        <div class="field">
+          <label>Estado</label>
+          <select id="h-status">
+            <option value="">Todos</option>
+            <option value="completed">completed</option>
+            <option value="processing">processing</option>
+            <option value="queued">queued</option>
+            <option value="failed">failed</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>videoId</label>
+          <input id="h-video" placeholder="id del video" />
+        </div>
+        <button id="btn-hist-buscar">Buscar eventos</button>
+        <button id="btn-hist-clear" class="small">Limpiar</button>
+      </div>
+
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Video</th>
+              <th>Fuente</th>
+              <th>Modo</th>
+              <th>Motivo</th>
+              <th>Estado</th>
+              <th>Resolución (antes→después)</th>
+              <th>Duración</th>
+              <th>Error</th>
+            </tr>
+          </thead>
+          <tbody id="hist-tbody"><tr><td colspan="9" class="muted" style="padding:20px;">Sin datos</td></tr></tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <span id="hist-page-info" class="muted"></span>
+        <button id="hist-prev">◀ Anterior</button>
+        <button id="hist-next">Siguiente ▶</button>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast"></div>
+
+  <!-- Modal historial por video -->
+  <div class="modal-bg" id="modal-bg">
+    <div class="modal">
+      <button class="tab close" id="modal-close">Cerrar ✕</button>
+      <h3 id="modal-title">Historial</h3>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const selected = new Set();
+    let page = 1, pages = 1, autoTimer = null;
+    let hPage = 1, hPages = 1, autoHistTimer = null;
+
+    function toast(msg, ms = 3800) {
+      const t = $('toast'); t.textContent = msg; t.style.display = 'block';
+      clearTimeout(t._h); t._h = setTimeout(() => (t.style.display = 'none'), ms);
+    }
+    function escapeHtml(s) {
+      return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+    }
+    function fmtFecha(d) { if (!d) return '—'; const x = new Date(d); return x.toLocaleString(); }
+    function fmtDur(ms) { if (!ms && ms !== 0) return '—'; const s = Math.round(ms/1000); return s < 60 ? `${s}s` : `${Math.floor(s/60)}m ${s%60}s`; }
+    function fmtBytes(b) { if (!b && b !== 0) return ''; if (b < 1024) return b + ' B'; if (b < 1024*1024) return (b/1024).toFixed(0) + ' KB'; return (b/1024/1024).toFixed(1) + ' MB'; }
+    function previewInfoHtml(v) {
+      const p = v.cardPreviewInfo;
+      if (p) {
+        const dim = (p.width && p.height) ? `${p.width}×${p.height}` : '';
+        const sz = p.bytes ? '· ' + fmtBytes(p.bytes) : '';
+        const src = p.source === 'custom' ? 'custom' : 'frame';
+        return `<span class="pill" style="background:rgba(34,197,94,.12);color:#86efac" title="Fuente de la preview">🖼 ${src}</span> <span class="muted">${dim} ${sz}</span>`;
+      }
+      if (v.tieneCustomPreview) return `<span class="muted">🖼 custom (sin generar)</span>`;
+      return `<span class="muted">🖼 —</span>`;
+    }
+
+    // ---------- Tabs ----------
+    document.querySelectorAll('.tab[data-tab]').forEach((b) => {
+      b.addEventListener('click', () => {
+        document.querySelectorAll('.tab[data-tab]').forEach((x) => x.classList.remove('active'));
+        b.classList.add('active');
+        const t = b.dataset.tab;
+        $('view-videos').classList.toggle('active', t === 'videos');
+        $('view-historial').classList.toggle('active', t === 'historial');
+        if (t === 'historial') { cargarBatches(); cargarHistorial(); }
+      });
+    });
+    function irHistorial(batchId) {
+      document.querySelector('.tab[data-tab="historial"]').click();
+      if (batchId) { $('h-batch').value = batchId; hPage = 1; cargarHistorial(); }
+    }
+
+    // ---------- Videos ----------
+    function qs() {
+      const p = new URLSearchParams();
+      if ($('f-q').value.trim()) p.set('q', $('f-q').value.trim());
+      if ($('f-carpeta').value) p.set('carpeta', $('f-carpeta').value);
+      if ($('f-status').value) p.set('status', $('f-status').value);
+      if ($('f-orient').value) p.set('orientacion', $('f-orient').value);
+      p.set('limit', $('f-limit').value); p.set('page', page);
+      return p.toString();
+    }
+    function updateSelUI() {
+      $('sel-count').textContent = `${selected.size} seleccionados`;
+      $('btn-reprocess').disabled = selected.size === 0;
+    }
+    async function cargar() {
+      try {
+        const res = await fetch('/api/admin/videos?' + qs());
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error al cargar');
+        pages = data.pagination.pages || 1;
+        $('total').textContent = `${data.pagination.total} videos`;
+        $('page-info').textContent = `Página ${data.pagination.page} de ${pages}`;
+        render(data.videos);
+      } catch (e) {
+        $('grid').innerHTML = `<span style="color:var(--err)">${escapeHtml(e.message)}</span>`;
+      }
+    }
+    function render(videos) {
+      if (!videos.length) { $('grid').innerHTML = `<span class="muted">Sin resultados</span>`; return; }
+      $('grid').innerHTML = videos.map((v) => {
+        const oc = v.orientacionCalculada || 'desconocida';
+        const sel = selected.has(v.id) ? 'checked' : '';
+        const selCard = selected.has(v.id) ? 'sel' : '';
+        const ur = v.ultimoReproceso;
+        const repro = v.reprocessCount
+          ? `<span class="s-${ur?.status||''}" title="${ur ? fmtFecha(ur.at) : ''}">${v.reprocessCount}× reproc.</span>`
+          : '';
+        const img = v.tienePreview
+          ? `<img loading="lazy" src="${v.previewUrl}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" /><span class="ph" style="display:none">sin preview</span>`
+          : `<span class="ph">sin preview</span>`;
+        return `<div class="vcard ${selCard}" data-card="${v.id}">
+          <input type="checkbox" class="chk rowcheck" data-id="${v.id}" ${sel} title="Seleccionar" />
+          <span class="badge pill s-${v.status||''}" style="background:rgba(0,0,0,.55)">${v.status || '—'}${v.progress!=null && v.status==='processing' ? ' '+v.progress+'%' : ''}</span>
+          <button class="hbtn small" data-hist="${v.id}" title="Ver historial">🕘</button>
+          <div class="thumb">${img}</div>
+          <div class="info">
+            <div class="vname" title="${escapeHtml(v.nombre)}">${escapeHtml(v.nombre)}</div>
+            <div class="meta">
+              <span class="pill v-${oc}">${oc}</span>
+              <span class="muted">${v.originalResolution || '—'}</span>
+              <span class="muted">${v.carpeta || ''}</span>
+              ${repro}
+            </div>
+            <div class="meta">${previewInfoHtml(v)}</div>
+            <div class="id">${v.id}</div>
+          </div>
+        </div>`;
+      }).join('');
+      document.querySelectorAll('.rowcheck').forEach((cb) => cb.addEventListener('change', () => {
+        if (cb.checked) selected.add(cb.dataset.id); else selected.delete(cb.dataset.id);
+        cb.closest('.vcard')?.classList.toggle('sel', cb.checked);
+        updateSelUI();
+      }));
+      document.querySelectorAll('[data-hist]').forEach((b) => b.addEventListener('click', (ev) => { ev.stopPropagation(); verHistorialVideo(b.dataset.hist); }));
+    }
+
+    $('check-all').addEventListener('change', (e) => {
+      document.querySelectorAll('.rowcheck').forEach((cb) => { cb.checked = e.target.checked; if (cb.checked) selected.add(cb.dataset.id); else selected.delete(cb.dataset.id); cb.closest('.vcard')?.classList.toggle('sel', cb.checked); });
+      updateSelUI();
+    });
+    $('btn-buscar').addEventListener('click', () => { page = 1; cargar(); });
+    $('btn-prev').addEventListener('click', () => { if (page > 1) { page--; cargar(); } });
+    $('btn-next').addEventListener('click', () => { if (page < pages) { page++; cargar(); } });
+
+    $('btn-reprocess').addEventListener('click', async () => {
+      const ids = [...selected];
+      if (!ids.length) return;
+      const reason = $('reason').value.trim();
+      const mode = $('mode').value;
+      const msg = mode === 'preview'
+        ? `¿Regenerar SOLO la preview de ${ids.length} video(s)? No se toca el HLS.`
+        : `¿Reprocesar ${ids.length} video(s) (video + preview)? Se borrará su HLS actual y se regenerará.`;
+      if (!confirm(msg)) return;
+      $('btn-reprocess').disabled = true;
+      try {
+        const res = await fetch('/api/admin/reprocess', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ids, reason, mode }) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error');
+        toast(`Lote ${data.batchId} — encolados: ${data.total}, omitidos: ${data.omitidos.length}.`);
+        selected.clear(); updateSelUI(); cargar();
+        setTimeout(() => irHistorial(data.batchId), 600);
+      } catch (e) { toast('Error: ' + e.message); }
+      finally { updateSelUI(); }
+    });
+
+    function toggleAuto() { if ($('autorefresh').checked) autoTimer = setInterval(cargar, 4000); else { clearInterval(autoTimer); autoTimer = null; } }
+    $('autorefresh').addEventListener('change', toggleAuto);
+
+    // ---------- Historial: lotes ----------
+    async function cargarBatches() {
+      try {
+        const res = await fetch('/api/admin/batches?limit=40');
+        const data = await res.json();
+        const lotes = data.lotes || [];
+        if (!lotes.length) { $('batches').innerHTML = '<span class="muted">Aún no hay reprocesos.</span>'; return; }
+        const activo = $('h-batch').value.trim();
+        $('batches').innerHTML = lotes.map((l) => `
+          <div class="card ${l.batchId === activo ? 'sel' : ''}" data-batch="${l.batchId}">
+            <div class="bid">${l.batchId}</div>
+            <div class="muted">${fmtFecha(l.firstAt)} · ${l.source || '—'}</div>
+            ${l.reason ? `<div style="margin-top:4px;">${escapeHtml(l.reason)}</div>` : ''}
+            <div class="nums">
+              <span>total ${l.total}</span>
+              <span class="s-completed">✓ ${l.completados}</span>
+              <span class="s-failed">✗ ${l.fallidos}</span>
+              <span class="s-processing">⏳ ${l.enProceso}</span>
+            </div>
+          </div>`).join('');
+        document.querySelectorAll('[data-batch]').forEach((c) => c.addEventListener('click', () => { $('h-batch').value = c.dataset.batch; hPage = 1; cargarBatches(); cargarHistorial(); }));
+      } catch (e) { $('batches').innerHTML = `<span style="color:var(--err)">${escapeHtml(e.message)}</span>`; }
+    }
+
+    // ---------- Historial: eventos ----------
+    function hqs() {
+      const p = new URLSearchParams();
+      if ($('h-batch').value.trim()) p.set('batchId', $('h-batch').value.trim());
+      if ($('h-status').value) p.set('status', $('h-status').value);
+      if ($('h-video').value.trim()) p.set('videoId', $('h-video').value.trim());
+      p.set('limit', '30'); p.set('page', hPage);
+      return p.toString();
+    }
+    async function cargarHistorial() {
+      try {
+        const res = await fetch('/api/admin/history?' + hqs());
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error');
+        hPages = data.pagination.pages || 1;
+        $('hist-page-info').textContent = `Página ${data.pagination.page} de ${hPages} · ${data.pagination.total} eventos`;
+        renderHist(data.eventos);
+      } catch (e) {
+        $('hist-tbody').innerHTML = `<tr><td colspan="9" style="color:var(--err); padding:20px;">${escapeHtml(e.message)}</td></tr>`;
+      }
+    }
+    function renderHist(eventos) {
+      if (!eventos.length) { $('hist-tbody').innerHTML = `<tr><td colspan="9" class="muted" style="padding:20px;">Sin eventos</td></tr>`; return; }
+      $('hist-tbody').innerHTML = eventos.map((e) => {
+        const resline = (e.fromResolution || e.toResolution) ? `${e.fromResolution || '?'} → ${e.toResolution || '?'}` : '—';
+        const modo = e.mode === 'preview' ? 'solo preview' : 'video+preview';
+        return `<tr>
+          <td>${fmtFecha(e.at)}</td>
+          <td class="name" title="${escapeHtml(e.nombre)}">${escapeHtml(e.nombre || '—')}<div class="id">${e.videoId}</div></td>
+          <td>${e.source || '—'}</td>
+          <td>${modo}</td>
+          <td>${escapeHtml(e.reason || '—')}</td>
+          <td class="s-${e.status || ''}">${e.status || '—'}</td>
+          <td>${resline}${e.orientation ? ` <span class="muted">(${e.orientation})</span>` : ''}</td>
+          <td>${fmtDur(e.durationMs)}</td>
+          <td style="color:var(--err)">${escapeHtml(e.errorMessage || '')}</td>
+        </tr>`;
+      }).join('');
+    }
+    $('btn-refresh-hist').addEventListener('click', () => { cargarBatches(); cargarHistorial(); });
+    $('btn-hist-buscar').addEventListener('click', () => { hPage = 1; cargarHistorial(); });
+    $('btn-hist-clear').addEventListener('click', () => { $('h-batch').value=''; $('h-status').value=''; $('h-video').value=''; hPage=1; cargarBatches(); cargarHistorial(); });
+    $('hist-prev').addEventListener('click', () => { if (hPage>1){hPage--; cargarHistorial();} });
+    $('hist-next').addEventListener('click', () => { if (hPage<hPages){hPage++; cargarHistorial();} });
+    function toggleAutoHist() { if ($('autorefresh-hist').checked) autoHistTimer = setInterval(() => { cargarBatches(); cargarHistorial(); }, 4000); else { clearInterval(autoHistTimer); autoHistTimer=null; } }
+    $('autorefresh-hist').addEventListener('change', toggleAutoHist);
+
+    // ---------- Modal historial por video ----------
+    async function verHistorialVideo(id) {
+      $('modal-title').textContent = 'Historial del video';
+      $('modal-body').innerHTML = 'Cargando…';
+      $('modal-bg').classList.add('open');
+      try {
+        const res = await fetch(`/api/admin/videos/${id}/history`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error');
+        $('modal-title').textContent = `Historial · ${data.nombre || id}`;
+        const h = data.historial || [];
+        if (!h.length) { $('modal-body').innerHTML = '<span class="muted">Este video no tiene reprocesos registrados.</span>'; return; }
+        $('modal-body').innerHTML = h.map((e) => `
+          <div style="border-bottom:1px solid var(--border); padding:8px 0;">
+            <div><span class="s-${e.status||''}">${e.status}</span> · <span class="muted">${fmtFecha(e.at)}</span> · ${e.source||''} · ${e.mode === 'preview' ? 'solo preview' : 'video+preview'} · <span class="id">${e.batchId||''}</span></div>
+            ${e.reason ? `<div>Motivo: ${escapeHtml(e.reason)}</div>` : ''}
+            <div class="muted">${(e.fromResolution||'?')} → ${(e.toResolution||'?')}${e.orientation?` (${e.orientation})`:''} · ${fmtDur(e.durationMs)}</div>
+            ${e.errorMessage ? `<div style="color:var(--err)">${escapeHtml(e.errorMessage)}</div>` : ''}
+          </div>`).join('');
+      } catch (e) { $('modal-body').innerHTML = `<span style="color:var(--err)">${escapeHtml(e.message)}</span>`; }
+    }
+    $('modal-close').addEventListener('click', () => $('modal-bg').classList.remove('open'));
+    $('modal-bg').addEventListener('click', (e) => { if (e.target === $('modal-bg')) $('modal-bg').classList.remove('open'); });
+
+    cargar();
+  </script>
+</body>
+</html>

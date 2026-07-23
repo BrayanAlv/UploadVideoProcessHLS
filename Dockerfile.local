@@ -1,0 +1,16 @@
+# Dockerfile para correr el proyecto en LOCAL (worker + API + panel admin).
+# FFmpeg/FFprobe vienen de la imagen (no de npm).
+FROM node:22-alpine
+
+RUN apk add --no-cache ffmpeg
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+
+EXPOSE 3000
+
+CMD ["node", "src/index.js"]

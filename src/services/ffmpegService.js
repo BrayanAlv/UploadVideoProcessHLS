@@ -7,22 +7,56 @@ class FFmpegService {
     return new Promise((resolve, reject) => {
       ffmpeg.ffprobe(filePath, (err, metadata) => {
         if (err) return reject(err);
-        
+
         const videoStream = metadata.streams.find(s => s.codec_type === 'video');
+        let width = videoStream ? videoStream.width : 0;
+        let height = videoStream ? videoStream.height : 0;
+
+        // Muchos celulares (ej. iPhone) graban con dimensiones "acostadas" y
+        // marcan la rotación real en metadata en vez de reescribir width/height.
+        // Si no se corrige, un video vertical se detecta como horizontal.
+        const rotation = this._getRotation(videoStream);
+        if (Math.abs(rotation) === 90 || Math.abs(rotation) === 270) {
+          [width, height] = [height, width];
+        }
+
         resolve({
           duration: metadata.format.duration,
-          width: videoStream ? videoStream.width : 0,
-          height: videoStream ? videoStream.height : 0,
+          width,
+          height,
           format: metadata.format.format_name
         });
       });
     });
   }
 
-  async generateHLS(inputPath, outputDir, resolution, onProgress) {
+  _getRotation(videoStream) {
+    if (!videoStream) return 0;
+
+    if (videoStream.tags && videoStream.tags.rotate) {
+      return parseInt(videoStream.tags.rotate, 10) || 0;
+    }
+
+    if (Array.isArray(videoStream.side_data_list)) {
+      const displayMatrix = videoStream.side_data_list.find(
+        (d) => typeof d.rotation === 'number'
+      );
+      if (displayMatrix) return displayMatrix.rotation;
+    }
+
+    return 0;
+  }
+
+  async generateHLS(inputPath, outputDir, resolution, onProgress, opts = {}) {
     if (!fs.existsSync(outputDir)) {
       fs.mkdirSync(outputDir, { recursive: true });
     }
+
+    // El bitrate se ajusta por resolución (escalera). Se mantienen los valores
+    // históricos como default para no cambiar el comportamiento de llamadas que
+    // no pasen opts (ej. rutas legacy).
+    const maxrate = opts.maxrate || '2000k';
+    const bufsize = opts.bufsize || '4000k';
 
     return new Promise((resolve, reject) => {
       let command = ffmpeg(inputPath)
@@ -31,16 +65,18 @@ class FFmpegService {
         .outputOptions([
           '-preset fast',
           '-crf 23',
-          '-maxrate 2000k',
-          '-bufsize 4000k',
+          `-maxrate ${maxrate}`,
+          `-bufsize ${bufsize}`,
           '-hls_time 10',
           '-hls_playlist_type vod',
           '-hls_segment_filename', path.join(outputDir, 'segment_%03d.ts')
         ]);
 
       if (resolution) {
-        // Aseguramos que el filtro de escalado mantenga la relación de aspecto y sea divisible por 2
-        command.size(resolution).aspect('16:9').autoPad();
+        // El resolution recibido ya trae la orientación correcta (horizontal o
+        // vertical); el pad usa el aspecto de ese tamaño fijo, así que no debe
+        // forzarse un 16:9 aquí (eso "acostaría" los videos verticales).
+        command.size(resolution).autoPad();
       }
 
       command
@@ -104,6 +140,34 @@ class FFmpegService {
           fs.writeFileSync(vttPath, vttContent);
           resolve(vttPath);
         })
+        .on('error', (err) => reject(err))
+        .run();
+    });
+  }
+
+  // Genera una preview para las cards del home en formato web (WebP),
+  // redimensionada de forma PROPORCIONAL a la imagen original (escala por
+  // ancho manteniendo la relación de aspecto; sin recorte ni pad). Si el
+  // ancho original es menor a `width`, no la agranda. Sirve tanto para la
+  // imagen custom (previewKey PNG/JPG) como para el thumbnail generado.
+  async generateCardPreview(inputPath, outputDir, fileName, { width = 640 } = {}) {
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
+    const outputPath = path.join(outputDir, fileName);
+
+    return new Promise((resolve, reject) => {
+      ffmpeg(inputPath)
+        .outputOptions([
+          '-vf', `scale='min(${width},iw)':-2`,
+          '-frames:v', '1',
+          '-c:v', 'libwebp',
+          '-q:v', '80',
+          '-compression_level', '6'
+        ])
+        .output(outputPath)
+        .on('end', () => resolve(outputPath))
         .on('error', (err) => reject(err))
         .run();
     });

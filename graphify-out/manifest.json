@@ -1,0 +1,112 @@
+{
+  "package.json": {
+    "mtime": 1784828177.0913265,
+    "ast_hash": "9c1d1a20348dd8c344015687a87c7153",
+    "semantic_hash": "9c1d1a20348dd8c344015687a87c7153"
+  },
+  "src/config/db.js": {
+    "mtime": 1784828177.0919044,
+    "ast_hash": "bab308e5f4e589e6e0bd2b0c6a118309",
+    "semantic_hash": "bab308e5f4e589e6e0bd2b0c6a118309"
+  },
+  "src/config/swagger.js": {
+    "mtime": 1784828177.0919292,
+    "ast_hash": "1d1180e9766c28fc6923d103ced6db03",
+    "semantic_hash": "1d1180e9766c28fc6923d103ced6db03"
+  },
+  "src/controllers/videoController.js": {
+    "mtime": 1784828177.0919292,
+    "ast_hash": "d8f3eead8c07ae4be67bf4891187dad7",
+    "semantic_hash": "d8f3eead8c07ae4be67bf4891187dad7"
+  },
+  "src/index.js": {
+    "mtime": 1784828177.0919292,
+    "ast_hash": "b485f351ecfc968bd63118512c6f45fa",
+    "semantic_hash": "b485f351ecfc968bd63118512c6f45fa"
+  },
+  "src/middlewares/errorHandler.js": {
+    "mtime": 1784828177.0919292,
+    "ast_hash": "29b317cb5dc4ac17602612c621975d3a",
+    "semantic_hash": "29b317cb5dc4ac17602612c621975d3a"
+  },
+  "src/middlewares/upload.js": {
+    "mtime": 1784828177.0920436,
+    "ast_hash": "9825ed83a05ef07075fb5415374e2bbd",
+    "semantic_hash": "9825ed83a05ef07075fb5415374e2bbd"
+  },
+  "src/models/Contenido.js": {
+    "mtime": 1784828177.0920436,
+    "ast_hash": "10d77fb031e1327d875550b95540f9ce",
+    "semantic_hash": "10d77fb031e1327d875550b95540f9ce"
+  },
+  "src/models/Video.js": {
+    "mtime": 1784828177.0920877,
+    "ast_hash": "1d04d200c3037b7cdc3a62af3d3c12e3",
+    "semantic_hash": "1d04d200c3037b7cdc3a62af3d3c12e3"
+  },
+  "src/routes/videoRoutes.js": {
+    "mtime": 1784828177.0920877,
+    "ast_hash": "3952836a1bcda9dd48bcfcf96c357f4a",
+    "semantic_hash": "3952836a1bcda9dd48bcfcf96c357f4a"
+  },
+  "src/services/b2Service.js": {
+    "mtime": 1784828177.0920877,
+    "ast_hash": "ec02a52c25a050c06545afc8a76096b5",
+    "semantic_hash": "ec02a52c25a050c06545afc8a76096b5"
+  },
+  "src/services/ffmpegService.js": {
+    "mtime": 1784828177.092457,
+    "ast_hash": "0916fab552031d159b915d00e92ca789",
+    "semantic_hash": "0916fab552031d159b915d00e92ca789"
+  },
+  "src/services/s3Service.js": {
+    "mtime": 1784828177.092457,
+    "ast_hash": "a8fca31b3500eb9b29677c2ff7c1bc39",
+    "semantic_hash": "a8fca31b3500eb9b29677c2ff7c1bc39"
+  },
+  "src/services/storageService.js": {
+    "mtime": 1784828177.092457,
+    "ast_hash": "7902576bce2b4bc7755e509d7a6acc44",
+    "semantic_hash": "7902576bce2b4bc7755e509d7a6acc44"
+  },
+  "src/services/videoProcessing.service.js": {
+    "mtime": 1784828177.092457,
+    "ast_hash": "b935a68048be0a666aab4cc026c443ab",
+    "semantic_hash": "b935a68048be0a666aab4cc026c443ab"
+  },
+  "src/workers/videoWorker.js": {
+    "mtime": 1784828177.092457,
+    "ast_hash": "d59e6c06ef13caa5a1a3a5309fb93ccb",
+    "semantic_hash": "d59e6c06ef13caa5a1a3a5309fb93ccb"
+  },
+  "test-db.js": {
+    "mtime": 1784828177.092457,
+    "ast_hash": "6e49c597986905c548d2ba8964d22ac9",
+    "semantic_hash": "6e49c597986905c548d2ba8964d22ac9"
+  },
+  "trigger.js": {
+    "mtime": 1784828177.092457,
+    "ast_hash": "d0a1f3c19d8be8545c841ad89fa54afa",
+    "semantic_hash": "d0a1f3c19d8be8545c841ad89fa54afa"
+  },
+  "CLAUDE.md": {
+    "mtime": 1784828420.5750868,
+    "ast_hash": "1da5db92729d48f93f3133c7e209db73",
+    "semantic_hash": "1da5db92729d48f93f3133c7e209db73"
+  },
+  "README.md": {
+    "mtime": 1784828177.0913265,
+    "ast_hash": "dc2dad0f265ec34ee53903fa0d4451cb",
+    "semantic_hash": "dc2dad0f265ec34ee53903fa0d4451cb"
+  },
+  "docker-compose.yml": {
+    "mtime": 1784828177.0913265,
+    "ast_hash": "ac63a6bfde40b19ff4d2a2636350b0cc",
+    "semantic_hash": "ac63a6bfde40b19ff4d2a2636350b0cc"
+  },
+  "documentacion.md": {
+    "mtime": 1784828177.0913265,
+    "ast_hash": "2994eba90b5539c775a8f6502a4e4b0b",
+    "semantic_hash": "2994eba90b5539c775a8f6502a4e4b0b"
+  }
+}
